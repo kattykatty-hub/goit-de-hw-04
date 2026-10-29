@@ -1,77 +1,97 @@
-# goit-de-hw-04
 
-Оптимізація та аналіз SparkUI в Apache Spark.
+#GoIT Data Engineering HW-04
 
-## Опис завдання
+#Apache Spark Optimization and SparkUI
 
-Проект реалізує аналіз даних з використанням Apache Spark та PySpark, демонструючи:
+#Project Description
 
--   Вплив додаткових Actions на кількість Jobs
--   Ефективність використання функції `cache()` для оптимізації обробки даних
--   Аналіз SparkUI для розуміння виконання завдань
+In this homework, I investigated how Apache Spark executes
+DataFrame operations and how intermediate actions and caching
+affect the number of Spark Jobs.
 
-Робота виконується з CSV-файлом `nuek-vuh3.csv`, який містить дані про пріоритети одиниць.
+I executed three PySpark programs and analyzed their results
+using the SparkUI Jobs page.
 
-## Етапи виконання
+#Technologies
 
-### Частина 1: Базовий пайплайн (5 Jobs)
+- Python
+- Apache Spark (PySpark)
+- SparkUI
+- Visual Studio Code
 
-**Результат:** 5 Jobs
+#Dataset
 
-![Частина 1: Базовий пайплайн](screenshots/part1_jobs.jpg)
+I used the `nuek-vuh3.csv` dataset provided for this assignment.
 
-### Частина 2: З проміжним Action (8 Jobs)
+The dataset is located in `data/nuek-vuh3.csv`.
 
-**Результат:** 8 Jobs (на 3 більше, ніж у частині 1)
+#Part 1 — Basic Execution
 
-**Чому на 3 Jobs більше?**
+I loaded the CSV dataset, repartitioned it into two partitions,
+filtered records where `final_priority < 3`, grouped them by
+`unit_id`, and counted the records.
 
--   Spark виконує весь пайплайн з початку для проміжного `collect()` (5 Jobs)
--   Потім виконує пайплайн знову для фінального `collect()`, але оскільки дані не закешовані, Spark перераховує все з початку (ще 3 Jobs для фільтрації та фінального collect)
+After filtering groups with `count > 2`, I executed `collect()`.
 
-![Частина 2: З проміжним Action](screenshots/part2_jobs.jpg)
+*Result: 5 completed Jobs.*
 
-### Частина 3: З використанням cache() (7 Jobs)
+The two CSV-related Jobs were triggered during schema inference.
+The final `collect()` triggered three additional Jobs.
 
-**Результат:** 7 Jobs (на 1 менше, ніж у частині 2)
+![Part 1 — 5 Jobs](screenshots/part1_jobs.jpg)
 
-**Чому менше Jobs?**
+#Part 2 — Intermediate Action
 
--   Завдяки `cache()`, проміжний результат зберігається в пам'яті після першого обчислення
--   Додаткові операції виконуються на закешованих даних, без повторного обчислення всього пайплайну
--   Це значно прискорює виконання та зменшує навантаження на систему
+I added an intermediate `collect()` before applying the final
+filter.
 
-![Частина 3: З використанням cache()](screenshots/part3_jobs.jpg)
+*Result: 8 completed Jobs.*
 
-## Запуск
+The additional action caused Spark to execute the aggregation
+before the final result was requested.
 
-Для запуску кожної частини окремо:
+Since the intermediate DataFrame was not cached, the final
+`collect()` triggered another computation.
 
-```bash
-# Частина 1
-python part1.py
+This resulted in three additional Jobs compared to Part 1.
 
-# Частина 2
-python part2.py
+![Part 2 — 8 Jobs](screenshots/part2_jobs.jpg)
 
-# Частина 3
-python part3.py
-```
+## Part 3 — Caching Optimization
 
-Після запуску коду відкрийте SparkUI за адресою: http://localhost:4040/jobs/
+I added `cache()` to the aggregated DataFrame.
 
-## Структура проекту
+The first `collect()` computed the intermediate result and
+populated the cache.
 
-```
-goit-de-hw-04/
-├── data/
-├── screenshots/
-│   ├── part1_jobs.jpg
-│   ├── part2_jobs.jpg
-│   └── part3_jobs.jpg
-├── nuek-vuh3.csv
-├── part1.py
-├── part2.py
-├── part3.py
-└── README.md
-```
+The second `collect()` reused the cached DataFrame instead
+of recomputing the entire aggregation.
+
+*Result: 7 completed Jobs.*
+
+I also used `unpersist()` to release the cached data.
+
+![Part 3 — 7 Jobs](screenshots/part3_jobs.jpg)
+
+#Results Comparison
+
+| Part | Completed Jobs | Description |
+|------|----------------|-------------|
+| 1 | 5 | Basic execution |
+| 2 | 8 | Additional collect() |
+| 3 | 7 | Intermediate result cached |
+
+#Conclusion
+
+I observed that Spark uses lazy evaluation, meaning
+transformations are not executed until an action is called.
+
+Adding an intermediate action increased the number of Jobs
+from 5 to 8 because Spark executed the computation twice.
+
+Using cache() reduced the number of Jobs from 8 to 7
+by allowing Spark to reuse the intermediate result.
+
+This experiment demonstrated how caching can avoid repeated
+computations and improve Spark execution efficiency.
+
